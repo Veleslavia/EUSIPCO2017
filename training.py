@@ -1,4 +1,5 @@
 import argparse
+import importlib
 import os
 import numpy as np
 import pandas as pd
@@ -116,7 +117,7 @@ def main():
         aparser.error('Please, specify the model to train!')
     try:
         if args.model in allowed_models:
-            model_module = __import__(args.model)
+            model_module = importlib.import_module(".{}".format(args.model), "experiments.models")
             print '%s imported as "model"' % args.model
         else:
             print "The specified model is not allowed"
