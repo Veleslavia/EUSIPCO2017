@@ -39,17 +39,6 @@ def build_model(n_classes):
 
     layers = list()
 
-    """
-    x = Convolution2D(16, 3, 3,
-                      border_mode='same',
-                      init='orthogonal',
-                      name='conv1')(melgram_input)
-    x = BatchNormalization(axis=channel_axis, mode=0, name='bn1')(x)
-    x = ELU()(x)
-    x = MaxPooling2D(pool_size=(N_MEL_BANDS/2, SEGMENT_DUR/2), name='pool1')(x)
-    layers.append(x)
-    """
-
     for m_i in m_sizes:
         for i, n_i in enumerate(n_sizes):
             x = Convolution2D(n_filters[i], m_i, n_i,
