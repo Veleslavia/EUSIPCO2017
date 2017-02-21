@@ -12,7 +12,6 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.metrics import fbeta_score
 
 from experiments.settings import *
-allowed_models = ['han16', 'mmotivated']
 
 
 class Trainer:
@@ -116,9 +115,9 @@ def main():
     if not args.model:
         aparser.error('Please, specify the model to train!')
     try:
-        if args.model in allowed_models:
+        if args.model in ALLOWED_MODELS:
             model_module = importlib.import_module(".{}".format(args.model), "experiments.models")
-            print '%s imported as "model"' % args.model
+            print "{} imported as 'model'".format(args.model)
         else:
             print "The specified model is not allowed"
     except ImportError, e:
