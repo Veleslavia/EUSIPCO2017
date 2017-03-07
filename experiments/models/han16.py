@@ -10,8 +10,8 @@ import librosa
 
 from ..settings import *
 
-MODEL_KEY = 'base_model'
-BASE_NAME = os.path.splitext(os.path.basename(__file__))[0] + "_full_stride"
+MODEL_KEY = 'han_base_model'
+BASE_NAME = os.path.splitext(os.path.basename(__file__))[0]
 N_SEGMENTS_PER_TRAINING_FILE = 3
 SAMPLES_PER_EPOCH = N_TRAINING_SET * N_SEGMENTS_PER_TRAINING_FILE * TRAIN_SPLIT
 SAMPLES_PER_VALIDATION = N_TRAINING_SET * N_SEGMENTS_PER_TRAINING_FILE * VALIDATION_SPLIT
@@ -99,7 +99,7 @@ def compute_spectrograms(filename):
 
     normalized_audio = _normalize(frames)
     melspectr = librosa.feature.melspectrogram(y=normalized_audio, sr=out_rate, n_mels=N_MEL_BANDS, fmax=out_rate/2)
-    logmelspectr = librosa.logamplitude(melspectr**2, ref_power=1.0)    # dimension (x, y) x - 128, y - time
+    logmelspectr = librosa.logamplitude(melspectr**2, ref_power=1.0)
 
     # now going through spectrogram with the stride of the segment duration
     for start_idx in range(0, logmelspectr.shape[1] - SEGMENT_DUR + 1, SEGMENT_DUR):

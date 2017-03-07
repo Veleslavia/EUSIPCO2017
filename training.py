@@ -1,30 +1,38 @@
 import argparse
 import importlib
 import os
+import pickle
+
 import numpy as np
 import pandas as pd
-import pickle
-from sklearn.model_selection import train_test_split
 from keras import backend as K
 from keras.utils.np_utils import to_categorical
 from keras.optimizers import SGD
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.callbacks import ModelCheckpoint, EarlyStopping, LearningRateScheduler
 from keras.metrics import fbeta_score
+from sklearn.model_selection import train_test_split
 
 from experiments.settings import *
 
 
-class Trainer:
+class Trainer(object):
     init_lr = 0.001
 
-    def __init__(self, X_train, X_val, y_train, y_val, model_module, optimizer):
-        self.X_train = X_train
-        self.X_val = X_val
-        self.y_train = y_train
-        self.y_val = y_val
+    def __init__(self, X_train, X_val, y_train, y_val, model_module, optimizer, load_to_memory):
         self.model_module = model_module
         self.dataset_mean = np.load(os.path.join(MODEL_MEANS_BASEPATH, "{}_mean.npy".format(model_module.BASE_NAME)))
         self.optimizer = optimizer if optimizer != 'sgd' else SGD(lr=self.init_lr, momentum=0.9, nesterov=True)
+        self.in_memory_data = load_to_memory
+        extended_x_train, extended_y_train = self._get_extended_data(X_train, y_train)
+        extended_x_val, extended_y_val = self._get_extended_data(X_val, y_val)
+        self.y_train = extended_y_train
+        self.y_val = extended_y_val
+        if self.in_memory_data:
+            self.X_train = self._load_features(extended_x_train)
+            self.X_val = self._load_features(extended_x_val)
+        else:
+            self.X_train = extended_x_train
+            self.X_val = extended_x_val
 
     def _load_features(self, filenames):
         features = list()
@@ -52,13 +60,15 @@ class Trainer:
 
     def _batch_generator(self, inputs, targets):
         assert len(inputs) == len(targets)
-        extended_inputs, extended_targets = self._get_extended_data(inputs, targets)
         while True:
-            indices = np.arange(len(extended_inputs))
+            indices = np.arange(len(inputs))
             np.random.shuffle(indices)
-            for start_idx in range(0, len(extended_inputs) - BATCH_SIZE + 1, BATCH_SIZE):
+            for start_idx in range(0, len(inputs) - BATCH_SIZE + 1, BATCH_SIZE):
                 excerpt = indices[start_idx:start_idx + BATCH_SIZE]
-                yield self._load_features(extended_inputs[excerpt]), extended_targets[excerpt]
+                if self.in_memory_data:
+                    yield inputs[excerpt], targets[excerpt]
+                else:
+                    yield self._load_features(inputs[excerpt]), targets[excerpt]
 
     def train(self):
         model = self.model_module.build_model(IRMAS_N_CLASSES)
@@ -68,10 +78,11 @@ class Trainer:
             "{weights_basepath}/{model_path}/".format(
                 weights_basepath=MODEL_WEIGHT_BASEPATH,
                 model_path=self.model_module.BASE_NAME) +
-            "epoch.{epoch:02d}-{val_loss:.2f}"+"-{key}.hdf5".format(
+            "epoch.{epoch:02d}-val_loss.{val_loss:.3f}-fbeta.{val_fbeta_score:.3f}"+"-{key}.hdf5".format(
                 key=self.model_module.MODEL_KEY),
             monitor='val_loss',
             save_best_only=True)
+        lrs = LearningRateScheduler(lambda epoch_n: self.init_lr / (2**(epoch_n//SGD_LR_REDUCE)))
         model.summary()
         model.compile(optimizer=self.optimizer,
                       loss='categorical_crossentropy',
@@ -81,7 +92,7 @@ class Trainer:
                                       samples_per_epoch=self.model_module.SAMPLES_PER_EPOCH,
                                       nb_epoch=MAX_EPOCH_NUM,
                                       verbose=2,
-                                      callbacks=[save_clb, early_stopping],
+                                      callbacks=[save_clb, early_stopping, lrs],
                                       validation_data=self._batch_generator(self.X_val, self.y_val),
                                       nb_val_samples=self.model_module.SAMPLES_PER_VALIDATION,
                                       class_weight=None,
@@ -98,18 +109,22 @@ def main():
     dataset = pd.read_csv(IRMAS_TRAINING_META_PATH, names=["filename", "class_id"])
     X_train, X_val, y_train, y_val = train_test_split(list(dataset.filename),
                                                       to_categorical(np.array(dataset.class_id, dtype=int)),
-                                                      test_size=VALIDATION_SPLIT,
-                                                      random_state=5)
+                                                      test_size=VALIDATION_SPLIT)
     aparser = argparse.ArgumentParser()
     aparser.add_argument('-m',
                          action='store',
                          dest='model',
-                         help='-m model to import; han16 or mmotivated')
+                         help='-m model to train')
     aparser.add_argument('-o',
                          action='store',
                          dest='optimizer',
                          default='sgd',
-                         help='-o optimizer; sgd or adam')
+                         help='-o optimizer')
+    aparser.add_argument('-l',
+                         action='store_true',
+                         dest='load_to_memory',
+                         default=False,
+                         help='-l load dataset to memory')
     args = aparser.parse_args()
 
     if not args.model:
@@ -123,7 +138,7 @@ def main():
     except ImportError, e:
         print e
 
-    trainer = Trainer(X_train, X_val, y_train, y_val, model_module, args.optimizer)
+    trainer = Trainer(X_train, X_val, y_train, y_val, model_module, args.optimizer, args.load_to_memory)
     trainer.train()
 
 

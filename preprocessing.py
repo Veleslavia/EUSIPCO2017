@@ -24,11 +24,11 @@ def main():
     aparser.add_argument('-m',
                          action='store',
                          dest='model',
-                         help='-m model to import; han16 or mmotivated')
+                         help='-m model for preprocessing')
     args = aparser.parse_args()
 
     if not args.model:
-        aparser.error('Please, specify the model to train!')
+        aparser.error('Please, specify the model!')
     try:
         if args.model in ALLOWED_MODELS:
             model_module = importlib.import_module(".{}".format(args.model), "experiments.models")
