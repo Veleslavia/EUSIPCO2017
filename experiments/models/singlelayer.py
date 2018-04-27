@@ -68,11 +68,11 @@ def compute_spectrograms(filename):
         # if less then 3 second - can't process
         raise Exception("Audio duration is too short")
 
-    logam = librosa.logamplitude
+    logam = librosa.power_to_db
     melgram = librosa.feature.melspectrogram
     x = logam(melgram(y=frames, sr=out_rate, hop_length=HOP_LEN,
                       n_fft=N_FFT, n_mels=N_MEL_BANDS) ** 2,
-              ref_power=1.0)
+              ref=1.0)
 
     # now going through spectrogram with the stride of the segment duration
     for start_idx in range(0, x.shape[1] - SEGMENT_DUR + 1, SEGMENT_DUR):
